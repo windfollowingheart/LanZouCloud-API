@@ -14,6 +14,18 @@
 # 简介
 
 - [x] ***目前更行了上传功能和获取下载链接功能。*** 
+## How to use?
+```
+pip install lanzou-api-windfollowingheart
+```
+
+```python
+from lanzou.api import LanZouCloud
+import time
+lzy = LanZouCloud()
+cookie = {'ylogin': '', 'phpdisk_info': ''}
+print(lzy.login_by_cookie(cookie) == LanZouCloud.SUCCESS)
+```
 文档参考: [上传功能和获取下载链接功能文档](https://github.com/windfollowingheart/LanZouCloud-API/wiki/%E4%B8%8B%E8%BD%BD%E5%92%8C%E4%B8%8A%E4%BC%A0%E6%96%87%E4%BB%B6)
     
 - 本库封装了蓝奏网盘的基础功能: 登录、注销、获取文件(夹)列表、下载文件、上传文件、删除文件(夹)、
