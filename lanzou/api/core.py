@@ -41,6 +41,11 @@ class LanZouCloud(object):
 
     def __init__(self):
         self._session = requests.Session()
+        proxies = {
+            "http://": "http://127.0.0.1:8888",
+            "https://": "http://127.0.0.1:8888",
+        }
+        # self._session.proxies = proxies
         self._limit_mode = True  # 是否保持官方限制
         self._timeout = 15  # 每个请求的超时(不包含下载响应体的用时)
         self._max_size = 100  # 单个文件大小上限 MB
@@ -51,9 +56,12 @@ class LanZouCloud(object):
         self._mydisk_url = 'https://pc.woozooo.com/mydisk.php'
         self._cookies = None
         self._headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36',
-            'Referer': 'https://pc.woozooo.com/mydisk.php',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 Edg/133.0.0.0',
+            'Referer': 'Referer: https://pan.lanzouw.com',
+            # 'Referer': 'https://pc.woozooo.com/mydisk.php',
             'Accept-Language': 'zh-CN,zh;q=0.9',  # 提取直连必需设置这个，否则拿不到数据
+            "Accept": "*/*",
+            
         }
         self._uid = 0 # uid 用于上传文件时的参数
         disable_warnings(InsecureRequestWarning)  # 全局禁用 SSL 警告
@@ -118,7 +126,7 @@ class LanZouCloud(object):
         login_data = {"task": "3", "setSessionId": "", "setToken": "", "setSig": "",
                       "setScene": "", "uid": username, "pwd": passwd}
         phone_header = {
-            "User-Agent": "Mozilla/5.0 (Linux; Android 5.0; SM-G900P Build/LRX21T) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/82.0.4051.0 Mobile Safari/537.36"}
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 Edg/133.0.0.0"}
         html = self._get(self._account_url)
         if not html:
             return LanZouCloud.NETWORK_ERROR
@@ -511,8 +519,10 @@ class LanZouCloud(object):
                                       pwd=pwd, url=share_url)
                 first_page = remove_notes(first_page.text)
                 # 一般情况 sign 的值就在 data 里，有时放在变量后面
-                sign = re.search(r"'sign':(.+?),", first_page).group(1)
+                # sign = re.search(r"'sign':(.+?),", first_page).group(1)
+                sign = re.search(r"'sign':'(.+?)',", first_page).group(1)
                 if len(sign) < 20:  # 此时 sign 保存在变量里面, 变量名是 sign 匹配的字符
+                    # sign = re.search(rf"var {sign}\s*=\s*'(.+?)';", first_page).group(1)
                     sign = re.search(rf"var {sign}\s*=\s*'(.+?)';", first_page).group(1)
                 post_data = {'action': 'downprocess', 'sign': sign, 'ves': 1}
                 # 某些特殊情况 share_url 会出现 webpage 参数, post_data 需要更多参数
@@ -772,6 +782,52 @@ class LanZouCloud(object):
         self.delete_rec(folder_id, False)
         return LanZouCloud.SUCCESS
 
+    def upload_binary_file(self, filename, file_data, folder_id=-1, *, callback=None, uploaded_handler=None) -> int:
+        """绕过格式限制上传不超过 max_size 的文件"""
+        
+        post_data = {
+            "task": "1",
+            "vie": "2",
+            "ve": "2",
+            "id": "WU_FILE_0",
+            "folder_id_bb_n": str(folder_id),
+            "name": filename,
+            "upload_file": (filename, file_data, 'application/octet-stream')
+        }
+
+        post_data = MultipartEncoder(post_data)
+        tmp_header = self._headers.copy()
+        tmp_header['Content-Type'] = post_data.content_type
+
+        # MultipartEncoderMonitor 每上传 8129 bytes数据调用一次回调函数，问题根源是 httplib 库
+        # issue : https://github.com/requests/toolbelt/issues/75
+        # 上传完成后，回调函数会被错误的多调用一次(强迫症受不了)。因此，下面重新封装了回调函数，修改了接受的参数，并阻断了多余的一次调用
+        self._upload_finished_flag = False  # 上传完成的标志
+
+        def _call_back(read_monitor):
+            if callback is not None:
+                if not self._upload_finished_flag:
+                    callback(filename, read_monitor.len, read_monitor.bytes_read)
+                if read_monitor.len == read_monitor.bytes_read:
+                    self._upload_finished_flag = True
+
+        monitor = MultipartEncoderMonitor(post_data, _call_back)
+        # result = self._post('https://pc.woozooo.com/fileup.php', data=monitor, headers=tmp_header, timeout=3600)
+        result = self._post('https://pc.woozooo.com/html5up.php', data=monitor, headers=tmp_header, timeout=3600)
+        if not result:  # 网络异常
+            return LanZouCloud.NETWORK_ERROR
+        else:
+            result = result.json()
+        if result["zt"] != 1:
+            logger.debug(f'Upload failed: result={result}')
+            return LanZouCloud.FAILED  # 上传失败
+
+        if uploaded_handler is not None:
+            file_id = int(result["text"][0]["id"])
+            uploaded_handler(file_id, is_file=True)  # 对已经上传的文件再进一步处理
+
+        return LanZouCloud.SUCCESS
+    
     def _upload_small_file(self, file_path, folder_id=-1, *, callback=None, uploaded_handler=None) -> int:
         """绕过格式限制上传不超过 max_size 的文件"""
         if not os.path.isfile(file_path):
@@ -783,7 +839,6 @@ class LanZouCloud(object):
                 return LanZouCloud.OFFICIAL_LIMITED
             file_path = let_me_upload(file_path)  # 添加了报尾的新文件
             need_delete = True
-
         # 文件已经存在同名文件就删除
         filename = name_format(os.path.basename(file_path))
         file_list = self.get_file_list(folder_id)
@@ -819,7 +874,8 @@ class LanZouCloud(object):
                     self._upload_finished_flag = True
 
         monitor = MultipartEncoderMonitor(post_data, _call_back)
-        result = self._post('https://pc.woozooo.com/fileup.php', data=monitor, headers=tmp_header, timeout=3600)
+        # result = self._post('https://pc.woozooo.com/fileup.php', data=monitor, headers=tmp_header, timeout=3600)
+        result = self._post('https://pc.woozooo.com/html5up.php', data=monitor, headers=tmp_header, timeout=3600)
         if not result:  # 网络异常
             file.close()
             return LanZouCloud.NETWORK_ERROR

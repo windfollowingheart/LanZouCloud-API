@@ -14,6 +14,11 @@ import requests
 __all__ = ['logger', 'remove_notes', 'name_format', 'time_format', 'is_name_valid', 'is_file_url',
            'is_folder_url', 'big_file_split', 'un_serialize', 'let_me_upload', 'auto_rename', 'calc_acw_sc__v2']
 
+proxies = {
+    "http://": "http://127.0.0.1:8888",
+    "https://": "http://127.0.0.1:8888",
+}
+
 # 调试日志设置
 logger = logging.getLogger('lanzou')
 logger.setLevel(logging.ERROR)
@@ -25,7 +30,7 @@ console.setFormatter(formatter)
 logger.addHandler(console)
 
 headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36 Edg/133.0.0.0',
     # 'Referer': 'https://pan.lanzous.com',  # 可以没有
     'Accept-Language': 'zh-CN,zh;q=0.9',
 }
