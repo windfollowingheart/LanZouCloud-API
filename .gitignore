@@ -6,7 +6,7 @@ __pycache__/
 .idea/
 .pypirc
 # *bat
-dist
+# dist
 build
 test*
 *-info

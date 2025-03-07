@@ -39,7 +39,8 @@ def upload_file():
     # file = open(r"D:\CODE\VsCode_CODE\Python\lanzouapi\LanZouCloud-API\test\test2.py", 'rb')
     file = None
     filename = None
-    file_path = r"D:\123pan\Downloads\csig_issue\文献\基于聚焦堆栈单体数据子集架构的全局成像.pdf"
+    # file_path = r"D:\123pan\Downloads\csig_issue\文献\基于聚焦堆栈单体数据子集架构的全局成像.pdf"
+    file_path = r"D:\CODE\VsCode_CODE\Python\lanzouapi\LanZouCloud-API\test\file.txt"
     last_dot_index = file_path.rfind('.')
     if last_dot_index != -1:
         # 切片拼接完成替换

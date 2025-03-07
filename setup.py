@@ -5,6 +5,8 @@ from lanzou_windfollowingheart.api import version
 
 with open("README.md", "r", encoding='utf8') as fh:
     long_description = fh.read()
+    
+
 
 setuptools.setup(
     name="lanzou-api-wind",
@@ -18,7 +20,9 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         "requests",
-        "requests_toolbelt"
+        "requests_toolbelt",
+        "asyncio",
+        "aiohttp"
     ],
     classifiers=[
         "Programming Language :: Python :: 3",

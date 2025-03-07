@@ -2,7 +2,7 @@
 蓝奏网盘 API，封装了对蓝奏云的各种操作，解除了上传格式、大小限制
 """
 
-import os
+import os, json
 import pickle
 import re
 import shutil
@@ -13,6 +13,8 @@ from time import sleep
 from typing import List
 
 import requests
+import aiohttp, asyncio
+from typing import AsyncGenerator, List
 from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
 from urllib3 import disable_warnings
 from urllib3.exceptions import InsecureRequestWarning
@@ -39,8 +41,13 @@ class LanZouCloud(object):
     CAPTCHA_ERROR = 10
     OFFICIAL_LIMITED = 11
 
-    def __init__(self):
-        self._session = requests.Session()
+    def __init__(self, is_async=False):
+        self.is_async = is_async
+        if self.is_async:
+            self._session = aiohttp.ClientSession()
+            pass
+        else:
+            self._session = requests.Session()
         proxies = {
             "http://": "http://127.0.0.1:8888",
             "https://": "http://127.0.0.1:8888",
@@ -76,6 +83,24 @@ class LanZouCloud(object):
                 logger.debug(f"Get {possible_url} failed, try another domain")
 
         return None
+    
+    async def _async_get(self, url, **kwargs):
+        # 创建 aiohttp 会话
+        async for possible_url in self._async_all_possible_urls(url):
+            try:
+                # async with self._session as session:
+                    # 发起异步 GET 请求，verify=False 对应 aiohttp 中 ssl=False
+                if self._cookies:
+                    for key, value in self._cookies.items():
+                        # 创建一个 Cookie 对象
+                        self._session.cookie_jar.update_cookies({key: value})
+                # async with self._session.get(possible_url, ssl=False, **kwargs) as response:
+                response = await self._session.get(possible_url, ssl=False, **kwargs)
+                # 等待响应内容
+                response_text = await response.text()
+                return response_text
+            except Exception as e:
+                print(f"异步请求出错: {e}")
 
     def _post(self, url, data, **kwargs):
         for possible_url in self._all_possible_urls(url):
@@ -87,6 +112,21 @@ class LanZouCloud(object):
                 logger.debug(f"Post to {possible_url} ({data}) failed, try another domain")
 
         return None
+    async def _async_post(self, url, data, **kwargs):
+        async for possible_url in self._async_all_possible_urls(url):
+            try:
+                async with aiohttp.ClientSession() as session:
+                    # 发起异步 GET 请求，verify=False 对应 aiohttp 中 ssl=False
+                    if self._cookies:
+                        for key, value in self._cookies.items():
+                            # 创建一个 Cookie 对象
+                            session.cookie_jar.update_cookies({key: value})
+                    async with session.post(url=possible_url, data=data, ssl=False, **kwargs) as response:
+                        # 等待响应内容
+                        response_text = await response.text()
+                        return response_text
+            except Exception as e:
+                print(f"异步请求出错: {e}")
 
     @staticmethod
     def _all_possible_urls(url: str) -> List[str]:
@@ -97,6 +137,21 @@ class LanZouCloud(object):
             'lanzoux.com'  # 鲁ICP备15001327号-5, 2020-06-09
         ]
         return [url.replace('lanzouo.com', d) for d in available_domains]
+    
+    @staticmethod
+    async def _async_all_possible_urls(url: str) :
+        """蓝奏云的主域名有时会挂掉, 此时尝试切换到备用域名"""
+        available_domains = [
+            'lanzouw.com',  # 鲁ICP备15001327号-7, 2021-09-02
+            'lanzoui.com',  # 鲁ICP备15001327号-6, 2020-06-09
+            'lanzoux.com'  # 鲁ICP备15001327号-5, 2020-06-09
+        ]
+        # return [url.replace('lanzouo.com', d) for d in available_domains]
+        for d in available_domains:
+            # 模拟异步操作，可根据实际情况修改
+            await asyncio.sleep(0.1)  
+            new_url = url.replace('lanzouo.com', d)
+            yield new_url
 
     def ignore_limits(self):
         """解除官方限制"""
@@ -153,11 +208,24 @@ class LanZouCloud(object):
     def login_by_cookie(self, cookie: dict) -> int:
         """通过cookie登录"""
         self._uid = cookie['ylogin'] # 将cookie的uid保存下来用于上传函数
-        self._session.cookies.update(cookie)
+        if not self.is_async:
+            self._session.cookies.update(cookie)
         html = self._get(self._account_url)
         if not html:
             return LanZouCloud.NETWORK_ERROR
         return LanZouCloud.FAILED if '网盘用户登录' in html.text else LanZouCloud.SUCCESS
+    
+    async def async_login_by_cookie(self, cookie: dict) -> int:
+        """通过cookie登录"""
+        self._uid = cookie['ylogin'] # 将cookie的uid保存下来用于上传函数
+        if not self.is_async:
+            self._session.cookies.update(cookie)
+        else:
+            self._cookies = cookie
+        html = await self._async_get(self._account_url)
+        if not html:
+            return LanZouCloud.NETWORK_ERROR
+        return LanZouCloud.FAILED if '网盘用户登录' in (html if type(html)==str else html.text) else LanZouCloud.SUCCESS
 
     def logout(self) -> int:
         """注销"""
@@ -463,7 +531,8 @@ class LanZouCloud(object):
             # 在页面被过多访问或其他情况下，有时候会先返回一个加密的页面，其执行计算出一个acw_sc__v2后放入页面后再重新访问页面才能获得正常页面
             # 若该页面进行了js加密，则进行解密，计算acw_sc__v2，并加入cookie
             acw_sc__v2 = calc_acw_sc__v2(first_page.text)
-            self._session.cookies.set("acw_sc__v2", acw_sc__v2)
+            if not self.is_async:
+                self._session.cookies.set("acw_sc__v2", acw_sc__v2)
             logger.debug(f"Set Cookie: acw_sc__v2={acw_sc__v2}")
             first_page = self._get(share_url)  # 文件分享页面(第一页)
             if not first_page:
@@ -819,6 +888,78 @@ class LanZouCloud(object):
             return LanZouCloud.NETWORK_ERROR
         else:
             result = result.json()
+        if result["zt"] != 1:
+            logger.debug(f'Upload failed: result={result}')
+            return LanZouCloud.FAILED  # 上传失败
+
+        if uploaded_handler is not None:
+            file_id = int(result["text"][0]["id"])
+            uploaded_handler(file_id, is_file=True)  # 对已经上传的文件再进一步处理
+
+        return LanZouCloud.SUCCESS
+    
+    async def _async_upload_binary_file(self, filename, file_data, folder_id=-1, *, callback=None, uploaded_handler=None) -> int:
+        """绕过格式限制上传不超过 max_size 的文件"""
+        
+        post_data = None
+        if not self.is_async:
+            post_data = {
+                "task": "1",
+                "vie": "2",
+                "ve": "2",
+                "id": "WU_FILE_0",
+                "folder_id_bb_n": str(folder_id),
+                "name": filename,
+                "upload_file": (filename, file_data, 'application/octet-stream')
+            }
+            
+            
+
+            post_data = MultipartEncoder(post_data)
+            
+        
+        else:
+            # 创建 FormData 对象
+            post_data = aiohttp.FormData()
+            post_data.add_field("task", "1")
+            post_data.add_field("vie", "2")
+            post_data.add_field("ve", "2")
+            post_data.add_field("id", "WU_FILE_0")
+            post_data.add_field("folder_id_bb_n", str(folder_id))
+            post_data.add_field("name", filename)
+            post_data.add_field("upload_file", file_data, filename=filename, content_type='application/octet-stream')
+
+        
+        tmp_header = self._headers.copy()
+        if not self.is_async:
+            tmp_header['Content-Type'] = post_data.content_type
+        # tmp_header['Content-Type'] = "application/octet-stream"
+
+        # MultipartEncoderMonitor 每上传 8129 bytes数据调用一次回调函数，问题根源是 httplib 库
+        # issue : https://github.com/requests/toolbelt/issues/75
+        # 上传完成后，回调函数会被错误的多调用一次(强迫症受不了)。因此，下面重新封装了回调函数，修改了接受的参数，并阻断了多余的一次调用
+        self._upload_finished_flag = False  # 上传完成的标志
+
+        def _call_back(read_monitor):
+            if callback is not None:
+                if not self._upload_finished_flag:
+                    callback(filename, read_monitor.len, read_monitor.bytes_read)
+                if read_monitor.len == read_monitor.bytes_read:
+                    self._upload_finished_flag = True
+        if self.is_async:
+            monitor = post_data
+        else:
+            monitor = MultipartEncoderMonitor(post_data, _call_back)
+        # result = self._post('https://pc.woozooo.com/fileup.php', data=monitor, headers=tmp_header, timeout=3600)
+        # result = self._post('https://pc.woozooo.com/fileup.php', data=monitor, headers=tmp_header, timeout=3600)
+        result = await self._async_post('https://pc.woozooo.com/html5up.php', data=monitor, headers=tmp_header, timeout=3600)
+        if not result:  # 网络异常 
+            return LanZouCloud.NETWORK_ERROR
+        else:
+            if self.is_async:
+                result = json.loads(result)
+            else:
+                result = result.json()
         if result["zt"] != 1:
             logger.debug(f'Upload failed: result={result}')
             return LanZouCloud.FAILED  # 上传失败
@@ -1186,7 +1327,8 @@ class LanZouCloud(object):
             # 在页面被过多访问或其他情况下，有时候会先返回一个加密的页面，其执行计算出一个acw_sc__v2后放入页面后再重新访问页面才能获得正常页面
             # 若该页面进行了js加密，则进行解密，计算acw_sc__v2，并加入cookie
             acw_sc__v2 = calc_acw_sc__v2(html)
-            self._session.cookies.set("acw_sc__v2", acw_sc__v2)
+            if not self.is_async:
+                self._session.cookies.set("acw_sc__v2", acw_sc__v2)
             logger.debug(f"Set Cookie: acw_sc__v2={acw_sc__v2}")
             html = self._get(share_url).text  # 文件分享页面(第一页)
 
