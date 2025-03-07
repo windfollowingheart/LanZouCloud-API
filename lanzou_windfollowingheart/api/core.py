@@ -17,9 +17,9 @@ from requests_toolbelt import MultipartEncoder, MultipartEncoderMonitor
 from urllib3 import disable_warnings
 from urllib3.exceptions import InsecureRequestWarning
 
-from lanzou.api.models import FileList, FolderList
-from lanzou.api.types import *
-from lanzou.api.utils import *
+from lanzou_windfollowingheart.api.models import FileList, FolderList
+from lanzou_windfollowingheart.api.types import *
+from lanzou_windfollowingheart.api.utils import *
 
 __all__ = ['LanZouCloud']
 

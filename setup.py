@@ -1,6 +1,6 @@
 import setuptools
 
-from lanzou.api import version
+from lanzou_windfollowingheart.api import version
 
 with open("README.md", "r", encoding='utf8') as fh:
     long_description = fh.read()
