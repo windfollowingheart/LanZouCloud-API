@@ -6,7 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lanzou_windfollowingheart.api import LanZouCloud
 import time
 lzy = LanZouCloud()
-cookie = {'ylogin': '3778427', 'phpdisk_info': 'AjUDNlI3AzcGMFU3WzZaCQdlVmZbCwdhATEAYwI8Cz5YZF5qDGcCPQM5BGJaCQRvVGZQYF4wAjcOOlczUDcKPQI%2FAzhSZQM7BjNVZFtgWmEHM1ZlWzIHZgFhAGUCNAtvWG9eaww8Aj4DNQRtWmMEV1Q1UGFeNAJtDjpXP1BgCjECNQM5UjY%3D'}
+cookie = {'ylogin': '3778427', 'phpdisk_info': ''}
 print(lzy.login_by_cookie(cookie) == LanZouCloud.SUCCESS)
 def get_dir_list():
     
@@ -47,11 +47,12 @@ def upload_file():
         # print(filename)
     with open(file_path, 'rb') as f:
         file = f.read()
-    code= lzy.upload_binary_file(filename, file, -1, uploaded_handler=handler)
+    code= lzy.upload_binary_file(filename, file, 11665772, uploaded_handler=handler)
     # print(file_id)
     return file_id
     
 if __name__ == "__main__":
     file_id = upload_file()
+    print(file_id)
     durl = get_durl_by_id(file_id)
     print(durl)
