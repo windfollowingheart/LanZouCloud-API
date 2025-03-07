@@ -813,8 +813,9 @@ class LanZouCloud(object):
 
         monitor = MultipartEncoderMonitor(post_data, _call_back)
         # result = self._post('https://pc.woozooo.com/fileup.php', data=monitor, headers=tmp_header, timeout=3600)
+        # result = self._post('https://pc.woozooo.com/fileup.php', data=monitor, headers=tmp_header, timeout=3600)
         result = self._post('https://pc.woozooo.com/html5up.php', data=monitor, headers=tmp_header, timeout=3600)
-        if not result:  # 网络异常
+        if not result:  # 网络异常 
             return LanZouCloud.NETWORK_ERROR
         else:
             result = result.json()

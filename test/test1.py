@@ -16,9 +16,11 @@ def get_folder_info_by_id():
     code = lzy.get_folder_info_by_id("9522903")
     print(code)
     
-def get_durl_by_id():
-    code = lzy.get_durl_by_id(226574157)
-    print(code)
+def get_durl_by_id(id=226578069):
+    code = lzy.get_durl_by_id(id)
+    # print(code)
+    # print(code.durl)
+    return code.durl
     
 def get_share_info():
     code = lzy.get_share_info(226574157)
@@ -29,11 +31,27 @@ def get_durl_by_url():
     print(code)
     
 def upload_file():
+    file_id = None
     def handler(fid, is_file):
-        print(fid, is_file)
-    file = open(r"D:\CODE\VsCode_CODE\Python\lanzouapi\LanZouCloud-API\test\test2.py", 'rb')
-    code= lzy.upload_binary_file("qqq.txt", file, -1, uploaded_handler=handler)
-    print(code)
+        nonlocal file_id
+        # print(fid, is_file)
+        file_id = fid
+    # file = open(r"D:\CODE\VsCode_CODE\Python\lanzouapi\LanZouCloud-API\test\test2.py", 'rb')
+    file = None
+    filename = None
+    file_path = r"D:\123pan\Downloads\csig_issue\文献\基于聚焦堆栈单体数据子集架构的全局成像.pdf"
+    last_dot_index = file_path.rfind('.')
+    if last_dot_index != -1:
+        # 切片拼接完成替换
+        filename = file_path[:last_dot_index] + "_" + file_path[last_dot_index + 1:] + ".txt"
+        # print(filename)
+    with open(file_path, 'rb') as f:
+        file = f.read()
+    code= lzy.upload_binary_file(filename, file, -1, uploaded_handler=handler)
+    # print(file_id)
+    return file_id
     
 if __name__ == "__main__":
-    get_durl_by_id()
+    file_id = upload_file()
+    durl = get_durl_by_id(file_id)
+    print(durl)
